@@ -1,0 +1,64 @@
+using System;
+using System.Data.SqlClient;
+using System.Data;
+using System.Net.Mail;
+using System.Threading;
+
+namespace appointmentsadmin
+{
+    class AppointmentsAdmin
+    {
+        static void Main(string[] args)
+        {
+            Console.WriteLine("Sending Appointment Reminders...");
+            Thread t = new Thread(SendMails);  
+            t.Start();
+        }
+
+        public static void SendMails()
+        {
+            while (true)
+            {
+                // connect to database
+                SqlConnection con = new SqlConnection(@"Data Source=.\SQLEXPRESS;AttachDbFilename=c:\appointments\app_data\ASPNETDB.MDF;Integrated Security=True;User Instance=True");
+                try
+                {
+                    con.Open();
+                    SqlCommand cmd = new SqlCommand("GetAppointmentsToNotify", con);
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    SqlDataReader dr = cmd.ExecuteReader();
+                    while (dr.Read())
+                    {
+                        // send mail 
+                        MailMessage m = new MailMessage();
+                        m.To.Add(new MailAddress(dr["email"].ToString()));
+                        m.From = new MailAddress("admin@classroom.com");  // change from address accordingly
+                        m.Subject = "Appointment Reminder";
+                        m.IsBodyHtml = true;
+                        m.Body = "Hi" + dr["username"] + "<p/> This is to remind you about the following appointment.<p/>"
+                               + "Title : " + dr["title"] + "<p/>" + "Appointment Date : " + dr["appdate"] + "<p/>Admin,<br/> Appointments.Com";
+                        SmtpClient server = new SmtpClient("classroom");  // change server name accordingly
+                        try
+                        {
+                            server.Send(m);
+                        }
+                        catch(Exception ex)
+                        {
+                            Console.WriteLine("Could not send mail to " + dr["email"]);
+                        }
+
+                    }
+                    dr.Close();
+                    con.Close();
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine(ex.Message);
+                    break;
+                }
+                Console.WriteLine("Sent reminders at : " + DateTime.Now);
+                Thread.Sleep(1000 * 60 * 60);  // 60 min
+            }
+        }
+    }
+}
